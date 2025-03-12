@@ -4,7 +4,7 @@
 pub struct Command {
     command_type: CommandType,
     #[allow(dead_code)]
-    args: Vec<String>,
+    pub args: Vec<String>,
 }
 
 /// `CommandDiscovery` when implemented by a "discovery"
@@ -17,8 +17,8 @@ pub trait CommandDiscovery {
 /// executions for each command should be provided.
 pub trait CommandExecutor {
     fn execute_help(&self) -> Result<(), String>;
-    fn execute_interface(&self) -> Result<(), String>;
-    fn execute_watch(&self) -> Result<(), String>;
+    fn execute_interface(&self, command: &Command) -> Result<(), String>;
+    fn execute_watch(&self, command: &Command) -> Result<(), String>;
 }
 
 impl Command {
@@ -40,8 +40,8 @@ impl Command {
     pub fn execute<T: CommandExecutor>(&self, executor: &T) -> Result<(), String> {
         match self.command_type {
             CommandType::Help => executor.execute_help(),
-            CommandType::Interface => executor.execute_interface(),
-            CommandType::Watch => executor.execute_watch(),
+            CommandType::Interface => executor.execute_interface(self),
+            CommandType::Watch => executor.execute_watch(self),
         }
     }
 }

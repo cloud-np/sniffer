@@ -1,4 +1,5 @@
 use core::{Command, CommandDiscovery, CommandExecutor, CommandType};
+use package_reader::packet_reader;
 
 pub struct CliExecutor;
 
@@ -18,11 +19,11 @@ impl CommandExecutor for CliExecutor {
         Ok(())
     }
 
-    fn execute_interface(&self) -> Result<(), String> {
-        todo!()
+    fn execute_interface(&self, command: &Command) -> Result<(), String> {
+        Ok(packet_reader::read(command.args[1].to_string()))
     }
 
-    fn execute_watch(&self) -> Result<(), String> {
+    fn execute_watch(&self, _command: &Command) -> Result<(), String> {
         todo!()
     }
 }
