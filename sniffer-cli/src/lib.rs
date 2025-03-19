@@ -20,7 +20,8 @@ impl CommandExecutor for CliExecutor {
     }
 
     fn execute_interface(&self, command: &Command) -> Result<(), String> {
-        Ok(packet_reader::read(command.args[1].to_string()))
+        packet_reader::read(command.args[1].to_string());
+        Ok(())
     }
 
     fn execute_watch(&self, _command: &Command) -> Result<(), String> {
