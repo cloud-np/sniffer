@@ -2,7 +2,7 @@
 /// that gets returned from a `CommandDiscovery`.
 #[derive(Debug, Clone)]
 pub struct Command {
-    command_type: CommandType,
+    pub flags: Flag,
     #[allow(dead_code)]
     pub args: Vec<String>,
 }
@@ -22,15 +22,15 @@ pub trait CommandExecutor {
 }
 
 impl Command {
-    pub fn new(command_type: CommandType) -> Command {
+    pub fn new(flags: Flag) -> Command {
         Command {
-            command_type,
+            flags,
             args: Vec::new(),
         }
     }
 
-    pub fn with_args(command_type: CommandType, args: Vec<String>) -> Self {
-        Command { command_type, args }
+    pub fn with_args(flag: Flag, args: Vec<String>) -> Self {
+        Command { flags: flag, args }
     }
 
     pub fn discover<T: CommandDiscovery>(discovery: &T) -> Option<Command> {
@@ -38,19 +38,19 @@ impl Command {
     }
 
     pub fn execute<T: CommandExecutor>(&self, executor: &T) -> Result<(), String> {
-        match self.command_type {
-            CommandType::Help => executor.execute_help(),
-            CommandType::Interface => executor.execute_interface(self),
-            CommandType::Watch => executor.execute_watch(self),
+        match self.flags {
+            Flag::Help => executor.execute_help(),
+            Flag::Interface(_) => executor.execute_interface(self),
+            Flag::Watch => executor.execute_watch(self),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum CommandType {
+pub enum Flag {
     Help,
-    Interface,
+    Interface(u8),
     Watch,
 }
 
-impl CommandType {}
+impl Flag {}

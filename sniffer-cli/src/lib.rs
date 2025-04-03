@@ -1,4 +1,4 @@
-use core::{Command, CommandDiscovery, CommandExecutor, CommandType};
+use core::{Command, CommandDiscovery, CommandExecutor, Flag};
 use package_reader::packet_reader;
 
 pub struct CliExecutor;
@@ -6,13 +6,7 @@ pub struct CliExecutor;
 impl CommandExecutor for CliExecutor {
     fn execute_help(&self) -> Result<(), String> {
         println!("Available commands:");
-        for cmd in [
-            CommandType::Help,
-            CommandType::Interface,
-            CommandType::Watch,
-        ]
-        .iter()
-        {
+        for cmd in [Flag::Help, Flag::Interface(0b0), Flag::Watch].iter() {
             let (short, long) = flags(cmd);
             println!("  -{}, --{}: {}", short, long, description(cmd));
         }
@@ -20,7 +14,12 @@ impl CommandExecutor for CliExecutor {
     }
 
     fn execute_interface(&self, command: &Command) -> Result<(), String> {
-        packet_reader::read(command.args[1].to_string());
+        let flags = if let Flag::Interface(v) = command.flags {
+            v
+        } else {
+            0
+        };
+        packet_reader::read(command.args[1].to_string(), flags);
         Ok(())
     }
 
@@ -49,34 +48,42 @@ fn command_from_args(args: &[String]) -> Option<Command> {
         return None;
     }
 
-    let cmd_str = &cmd_args[0];
-    if let Some(cmd_type) = command_type_from_arg(cmd_str) {
-        return Some(Command::with_args(cmd_type, cmd_args));
+    if let Some(flag) = flag_from_args(&cmd_args) {
+        return Some(Command::with_args(flag, cmd_args));
     }
     None
 }
 
-fn command_type_from_arg(arg: &str) -> Option<CommandType> {
-    match arg {
-        "h" | "help" | "-h" | "--help" => Some(CommandType::Help),
-        "i" | "interface" | "-i" | "--interface" => Some(CommandType::Interface),
-        "w" | "watch" | "-w" | "--watch" => Some(CommandType::Watch),
+fn flag_from_args(args: &[String]) -> Option<Flag> {
+    let cmd_str = &args[0];
+    match cmd_str.as_str() {
+        "h" | "help" | "-h" | "--help" => Some(Flag::Help),
+        "i" | "interface" | "-i" | "--interface" => {
+            // assuming the user provides the interface name as the next argument
+            // then verbose as the third argument: "-i eth0 v" or "i eth0 --verbose"
+            let is_verbose = args
+                .get(2)
+                .map(|arg| matches!(arg.as_str(), "v" | "-v" | "--verbose"))
+                .unwrap_or(false);
+            Some(Flag::Interface(if is_verbose { 0b1 } else { 0b0 }))
+        }
+        "w" | "watch" | "-w" | "--watch" => Some(Flag::Watch),
         _ => None,
     }
 }
 
-pub fn flags(command_type: &CommandType) -> (&str, &str) {
-    match command_type {
-        CommandType::Help => ("h", "help"),
-        CommandType::Interface => ("i", "interface"),
-        CommandType::Watch => ("w", "watch"),
+pub fn flags(flag: &Flag) -> (&str, &str) {
+    match flag {
+        Flag::Help => ("h", "help"),
+        Flag::Interface(_) => ("i", "interface"),
+        Flag::Watch => ("w", "watch"),
     }
 }
 
-pub fn description(command_type: &CommandType) -> &str {
-    match command_type {
-        CommandType::Help => "Display help information",
-        CommandType::Interface => "Configure network interface",
-        CommandType::Watch => "Monitor network packets",
+pub fn description(flag: &Flag) -> &str {
+    match flag {
+        Flag::Help => "Display help information",
+        Flag::Interface(_) => "Configure network interface",
+        Flag::Watch => "Monitor network packets",
     }
 }
