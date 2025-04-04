@@ -37,9 +37,6 @@ pub mod packet_reader {
             match rx.next() {
                 Ok(packet) => {
                     if let Some(packet) = EthernetPacket::new(packet) {
-                        // println!("Source MAC: {}", packet.get_source());
-                        // println!("Destination MAC: {}", packet.get_destination());
-
                         handle_ethernet_frame(&interface, &packet, flags);
                     }
                 }

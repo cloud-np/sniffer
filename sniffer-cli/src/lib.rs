@@ -55,20 +55,22 @@ fn command_from_args(args: &[String]) -> Option<Command> {
 }
 
 fn flag_from_args(args: &[String]) -> Option<Flag> {
-    let cmd_str = &args[0];
-    match cmd_str.as_str() {
-        "h" | "help" | "-h" | "--help" => Some(Flag::Help),
-        "i" | "interface" | "-i" | "--interface" => {
-            // assuming the user provides the interface name as the next argument
-            // then verbose as the third argument: "-i eth0 v" or "i eth0 --verbose"
-            let is_verbose = args
-                .get(2)
-                .map(|arg| matches!(arg.as_str(), "v" | "-v" | "--verbose"))
-                .unwrap_or(false);
-            Some(Flag::Interface(if is_verbose { 0b1 } else { 0b0 }))
+    // let cmd_str = &args[0];
+    for arg in args.iter() {
+        match arg.as_str() {
+            "-h" | "--help" => return Some(Flag::Help),
+            "-i" | "--interface" => {
+                // assuming the user provides the interface name as the next argument
+                // then verbose as the third argument: "-i eth0 -v" or "--interface eth0 --verbose"
+                let is_verbose = args
+                    .get(2)
+                    .map(|arg| matches!(arg.as_str(), "-v" | "--verbose"))
+                    .unwrap_or(false);
+                return Some(Flag::Interface("eth0".to_string()));
+            }
+            "-w" | "--watch" => return Some(Flag::Watch),
+            _ => return None,
         }
-        "w" | "watch" | "-w" | "--watch" => Some(Flag::Watch),
-        _ => None,
     }
 }
 
@@ -77,6 +79,7 @@ pub fn flags(flag: &Flag) -> (&str, &str) {
         Flag::Help => ("h", "help"),
         Flag::Interface(_) => ("i", "interface"),
         Flag::Watch => ("w", "watch"),
+        Flag::Details => ("d", "details"),
     }
 }
 
@@ -85,5 +88,6 @@ pub fn description(flag: &Flag) -> &str {
         Flag::Help => "Display help information",
         Flag::Interface(_) => "Configure network interface",
         Flag::Watch => "Monitor network packets",
+        Flag::Details => "Enable detailed output",
     }
 }
