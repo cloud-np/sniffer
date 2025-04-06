@@ -1,4 +1,4 @@
-use core::{Command, CommandDiscovery, CommandExecutor, CommandType};
+use core::{Command, CommandDiscovery, CommandExecutor, Flag};
 use package_reader::packet_reader;
 
 pub struct CliExecutor;
@@ -6,21 +6,26 @@ pub struct CliExecutor;
 impl CommandExecutor for CliExecutor {
     fn execute_help(&self) -> Result<(), String> {
         println!("Available commands:");
-        for cmd in [
-            CommandType::Help,
-            CommandType::Interface,
-            CommandType::Watch,
-        ]
-        .iter()
-        {
-            let (short, long) = flags(cmd);
-            println!("  -{}, --{}: {}", short, long, description(cmd));
+        for cmd in Flag::all() {
+            let (short, long) = Flag::get_flag_usage(&cmd);
+            println!("  -{}, --{}: {}", short, long, Flag::description(&cmd));
         }
         Ok(())
     }
 
     fn execute_interface(&self, command: &Command) -> Result<(), String> {
-        packet_reader::read(command.args[1].to_string());
+        let interface = if let Flag::Interface(i) = &command.main_flag {
+            i
+        } else {
+            panic!("Invalid interface passed");
+        };
+        packet_reader::read(
+            interface,
+            command
+                .flags
+                .iter()
+                .any(|flag| matches!(flag, Flag::Details)),
+        );
         Ok(())
     }
 
@@ -39,44 +44,38 @@ impl CommandDiscovery for CliDiscovery {
 }
 
 fn command_from_args(args: &[String]) -> Option<Command> {
-    let cmd_args: Vec<String> = args
-        .iter()
-        .skip_while(|arg| !arg.starts_with("-"))
-        .cloned()
-        .collect();
+    let cmd_args: Vec<String> = match args.iter().position(|arg| arg.starts_with("-")) {
+        Some(pos) => args[pos..].to_vec(),
+        None => Vec::new(),
+    };
 
     if cmd_args.is_empty() {
         return None;
     }
 
-    let cmd_str = &cmd_args[0];
-    if let Some(cmd_type) = command_type_from_arg(cmd_str) {
-        return Some(Command::with_args(cmd_type, cmd_args));
+    if let Some(flags) = flags_from_args(&cmd_args) {
+        return Some(Command::with_args(flags, cmd_args));
     }
     None
 }
 
-fn command_type_from_arg(arg: &str) -> Option<CommandType> {
-    match arg {
-        "h" | "help" | "-h" | "--help" => Some(CommandType::Help),
-        "i" | "interface" | "-i" | "--interface" => Some(CommandType::Interface),
-        "w" | "watch" | "-w" | "--watch" => Some(CommandType::Watch),
-        _ => None,
-    }
-}
-
-pub fn flags(command_type: &CommandType) -> (&str, &str) {
-    match command_type {
-        CommandType::Help => ("h", "help"),
-        CommandType::Interface => ("i", "interface"),
-        CommandType::Watch => ("w", "watch"),
-    }
-}
-
-pub fn description(command_type: &CommandType) -> &str {
-    match command_type {
-        CommandType::Help => "Display help information",
-        CommandType::Interface => "Configure network interface",
-        CommandType::Watch => "Monitor network packets",
-    }
+fn flags_from_args(args: &[String]) -> Option<Vec<Flag>> {
+    let flags: Vec<Flag> = args
+        .iter()
+        .enumerate()
+        .filter_map(|(index, arg)| match arg.as_str() {
+            "-h" | "--help" => Some(Flag::Help),
+            "-i" | "--interface" => {
+                if let Some(interface_name) = args.get(index + 1) {
+                    Some(Flag::Interface(interface_name.clone()))
+                } else {
+                    panic!("No interface name provided");
+                }
+            }
+            "-d" | "--details" => Some(Flag::Details),
+            "-w" | "--watch" => Some(Flag::Watch),
+            _ => None,
+        })
+        .collect();
+    Some(flags)
 }

@@ -1,20 +1,22 @@
 pub mod packet_reader {
+    use std::net::IpAddr;
     use std::process;
 
     use pnet::datalink::Channel::Ethernet;
-    use pnet::datalink::{self};
+    use pnet::datalink::{self, NetworkInterface};
     use pnet::packet::ethernet::{EtherTypes, EthernetPacket};
-    use pnet::packet::ip::IpNextHeaderProtocols;
+    use pnet::packet::ip::{IpNextHeaderProtocol, IpNextHeaderProtocols};
     use pnet::packet::ipv4::Ipv4Packet;
+    use pnet::packet::ipv6::Ipv6Packet;
     use pnet::packet::tcp::TcpPacket;
     use pnet::packet::udp::UdpPacket;
     use pnet::packet::Packet;
 
-    pub fn read(interface_name: String) {
+    pub fn read(interface_name: &String, is_hex_dump: bool) {
         let interfaces = datalink::interfaces();
         let interface = interfaces
             .into_iter()
-            .find(|iface| iface.name == interface_name)
+            .find(|iface| iface.name == *interface_name)
             .unwrap_or_else(|| {
                 eprintln!("No such interface '{}'", interface_name);
                 process::exit(1);
@@ -35,55 +37,157 @@ pub mod packet_reader {
             match rx.next() {
                 Ok(packet) => {
                     if let Some(packet) = EthernetPacket::new(packet) {
-                        println!("Source MAC: {}", packet.get_source());
-                        println!("Destination MAC: {}", packet.get_destination());
-
-                        match_packet(&packet);
+                        handle_ethernet_frame(&interface, &packet, is_hex_dump);
                     }
                 }
                 Err(e) => {
-                    eprintln!("An erro occured while reading from the channel: {}", e);
+                    eprintln!("An error occured while reading from the channel: {}", e);
                 }
             }
         }
     }
 
-    fn match_packet(packet: &EthernetPacket<'_>) {
+    fn handle_ethernet_frame(
+        interface: &NetworkInterface,
+        packet: &EthernetPacket,
+        is_hex_dump: bool,
+    ) {
+        let interface_name = &interface.name[..];
         match packet.get_ethertype() {
-            EtherTypes::Ipv4 => {
-                if let Some(ipv4) = Ipv4Packet::new(packet.payload()) {
-                    println!(
-                        "IPv4 Packet: {} -> {}",
-                        ipv4.get_source(),
-                        ipv4.get_destination()
-                    );
+            EtherTypes::Ipv4 => handle_ipv4_packet(interface_name, packet, is_hex_dump),
+            EtherTypes::Ipv6 => handle_ipv6_packet(interface_name, packet, is_hex_dump),
+            // EtherTypes::Arp => handle_arp_packet(interface_name, packet),
+            _ => println!(
+                "[{}]: Unknown packet: {} > {}; ethertype: {:?} length: {}",
+                interface_name,
+                packet.get_source(),
+                packet.get_destination(),
+                packet.get_ethertype(),
+                packet.packet().len()
+            ),
+        }
+    }
 
-                    match ipv4.get_next_level_protocol() {
-                        IpNextHeaderProtocols::Tcp => {
-                            if let Some(tcp) = TcpPacket::new(ipv4.payload()) {
-                                println!(
-                                    "TCP Packet: {} -> {}\nPayload:\n{}",
-                                    tcp.get_source(),
-                                    tcp.get_destination(),
-                                    map_hex_dump(tcp.payload())
-                                );
-                            }
-                        }
-                        IpNextHeaderProtocols::Udp => {
-                            if let Some(udp) = UdpPacket::new(ipv4.payload()) {
-                                println!(
-                                    "UDP Packet: {} -> {}\nPayload:\n{}",
-                                    udp.get_source(),
-                                    udp.get_destination(),
-                                    map_hex_dump(udp.payload())
-                                );
-                            }
-                        }
-                        protocol => println!("Other protocol: {:?}", protocol),
-                    }
-                }
+    fn handle_udp_packet(
+        interface_name: &str,
+        source: IpAddr,
+        destination: IpAddr,
+        packet: &[u8],
+        is_hex_dump: bool,
+    ) {
+        let udp = UdpPacket::new(packet);
+
+        if let Some(udp) = udp {
+            let mut message = format!("[{}]: UDP Packet: ", interface_name,);
+
+            message.push_str(&format!(
+                "{} {} > {}; length: {}",
+                message,
+                source,
+                destination,
+                packet.len()
+            ));
+            if is_hex_dump {
+                message.push_str(&format!("{}\n{}", message, map_hex_dump(udp.payload())));
             }
-            ethertype => println!("Other ethertype: {:?}", ethertype),
+            println!("{}", message);
+        } else {
+            println!("[{}]: Malformed UDP Packet", interface_name);
+        }
+    }
+
+    fn handle_tcp_packet(
+        interface_name: &str,
+        source: IpAddr,
+        destination: IpAddr,
+        packet: &[u8],
+        is_hex_dump: bool,
+    ) {
+        let tcp = TcpPacket::new(packet);
+        if let Some(tcp) = tcp {
+            let mut message = format!("[{}]: UDP Packet: ", interface_name,);
+
+            message.push_str(&format!(
+                "{} {} > {}; length: {}",
+                message,
+                source,
+                destination,
+                packet.len()
+            ));
+            if is_hex_dump {
+                message.push_str(&format!("{}\n{}", message, map_hex_dump(tcp.payload())));
+            }
+            println!("{}", message);
+        } else {
+            println!("[{}]: Malformed TCP Packet", interface_name);
+        }
+    }
+
+    fn handle_transport_protocol(
+        interface_name: &str,
+        source: IpAddr,
+        destination: IpAddr,
+        protocol: IpNextHeaderProtocol,
+        packet: &[u8],
+        is_hex_dump: bool,
+    ) {
+        match protocol {
+            IpNextHeaderProtocols::Udp => {
+                handle_udp_packet(interface_name, source, destination, packet, is_hex_dump)
+            }
+            IpNextHeaderProtocols::Tcp => {
+                handle_tcp_packet(interface_name, source, destination, packet, is_hex_dump)
+            }
+            // IpNextHeaderProtocols::Icmp => {
+            //     handle_icmp_packet(interface_name, source, destination, packet)
+            // }
+            // IpNextHeaderProtocols::Icmpv6 => {
+            //     handle_icmpv6_packet(interface_name, source, destination, packet)
+            // }
+            _ => println!(
+                "[{}]: Unknown {} packet: {} > {}; protocol: {:?} length: {}",
+                interface_name,
+                match source {
+                    IpAddr::V4(..) => "IPv4",
+                    _ => "IPv6",
+                },
+                source,
+                destination,
+                protocol,
+                packet.len()
+            ),
+        }
+    }
+
+    fn handle_ipv4_packet(interface_name: &str, ethernet: &EthernetPacket, is_hex_dump: bool) {
+        let header = Ipv4Packet::new(ethernet.payload());
+        if let Some(header) = header {
+            handle_transport_protocol(
+                interface_name,
+                IpAddr::V4(header.get_source()),
+                IpAddr::V4(header.get_destination()),
+                header.get_next_level_protocol(),
+                header.payload(),
+                is_hex_dump,
+            );
+        } else {
+            println!("[{}]: Malformed IPv4 Packet", interface_name);
+        }
+    }
+
+    fn handle_ipv6_packet(interface_name: &str, ethernet: &EthernetPacket, is_hex_dump: bool) {
+        let header = Ipv6Packet::new(ethernet.payload());
+        if let Some(header) = header {
+            handle_transport_protocol(
+                interface_name,
+                IpAddr::V6(header.get_source()),
+                IpAddr::V6(header.get_destination()),
+                header.get_next_header(),
+                header.payload(),
+                is_hex_dump,
+            );
+        } else {
+            println!("[{}]: Malformed IPv6 Packet", interface_name);
         }
     }
 

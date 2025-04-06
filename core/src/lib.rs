@@ -2,7 +2,8 @@
 /// that gets returned from a `CommandDiscovery`.
 #[derive(Debug, Clone)]
 pub struct Command {
-    command_type: CommandType,
+    pub main_flag: Flag,
+    pub flags: Vec<Flag>,
     #[allow(dead_code)]
     pub args: Vec<String>,
 }
@@ -22,15 +23,21 @@ pub trait CommandExecutor {
 }
 
 impl Command {
-    pub fn new(command_type: CommandType) -> Command {
+    // Exists in case of a graphical user interface
+    pub fn new(flags: Vec<Flag>) -> Command {
         Command {
-            command_type,
+            main_flag: flags[0].clone(),
+            flags,
             args: Vec::new(),
         }
     }
 
-    pub fn with_args(command_type: CommandType, args: Vec<String>) -> Self {
-        Command { command_type, args }
+    pub fn with_args(flags: Vec<Flag>, args: Vec<String>) -> Self {
+        Command {
+            main_flag: flags[0].clone(),
+            flags,
+            args,
+        }
     }
 
     pub fn discover<T: CommandDiscovery>(discovery: &T) -> Option<Command> {
@@ -38,19 +45,50 @@ impl Command {
     }
 
     pub fn execute<T: CommandExecutor>(&self, executor: &T) -> Result<(), String> {
-        match self.command_type {
-            CommandType::Help => executor.execute_help(),
-            CommandType::Interface => executor.execute_interface(self),
-            CommandType::Watch => executor.execute_watch(self),
+        match self.main_flag {
+            Flag::Help => executor.execute_help(),
+            Flag::Interface(_) => executor.execute_interface(self),
+            Flag::Watch => executor.execute_watch(self),
+            Flag::Details => executor.execute_watch(self),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum CommandType {
+pub enum Flag {
     Help,
-    Interface,
+    Interface(String),
     Watch,
+    Details,
 }
 
-impl CommandType {}
+impl Flag {
+    // Change the return type to a slice instead of an array
+    pub fn all() -> Vec<Flag> {
+        vec![
+            Flag::Help,
+            Flag::Interface("".to_string()),
+            Flag::Watch,
+            Flag::Details,
+        ]
+    }
+
+    // TODO: Fix the function name
+    pub fn get_flag_usage(flag: &Flag) -> (&'static str, &'static str) {
+        match flag {
+            Flag::Help => ("h", "help"),
+            Flag::Interface(_) => ("i", "interface"),
+            Flag::Watch => ("w", "watch"),
+            Flag::Details => ("d", "details"),
+        }
+    }
+
+    pub fn description(flag: &Flag) -> &str {
+        match flag {
+            Flag::Help => "Display help information",
+            Flag::Interface(_) => "Configure network interface",
+            Flag::Watch => "Monitor network packets",
+            Flag::Details => "Enable detailed output",
+        }
+    }
+}
