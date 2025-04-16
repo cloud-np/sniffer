@@ -49,7 +49,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43794a0ace135be66a25d3ae77d41b91615fb68ae937f904090203e81f755b65"
 
 [[package]]
-name = "package-reader"
+name = "packets"
 version = "0.1.0"
 dependencies = [
  "pnet",
@@ -218,7 +218,7 @@ name = "sniffer"
 version = "0.1.0"
 dependencies = [
  "core",
- "package-reader",
+ "packets",
  "sniffer-cli",
 ]
 
@@ -227,7 +227,7 @@ name = "sniffer-cli"
 version = "0.1.0"
 dependencies = [
  "core",
- "package-reader",
+ "packets",
 ]
 
 [[package]]

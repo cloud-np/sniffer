@@ -1,3 +1,7 @@
+## Important Note
+This project is just for educational purposes and is not intended for production use.
+It is simply made for learning thats why the code is not optimized, not secure and most importantly **overengineered**.
+
 # Sniffer
 A simple sniffer that captures packets from the network and displays them in a human-readable format.
 Using Rust so its BLAZING FAST! (not really) but it's fun to write in Rust.

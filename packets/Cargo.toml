@@ -1,5 +1,5 @@
 [package]
-name = "package-reader"
+name = "packets"
 version.workspace = true
 edition.workspace = true
 

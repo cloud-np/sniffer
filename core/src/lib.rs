@@ -20,6 +20,7 @@ pub trait CommandExecutor {
     fn execute_help(&self) -> Result<(), String>;
     fn execute_interface(&self, command: &Command) -> Result<(), String>;
     fn execute_watch(&self, command: &Command) -> Result<(), String>;
+    fn execute_file(&self, command: &Command) -> Result<(), String>;
 }
 
 impl Command {
@@ -50,6 +51,7 @@ impl Command {
             Flag::Interface(_) => executor.execute_interface(self),
             Flag::Watch => executor.execute_watch(self),
             Flag::Details => executor.execute_watch(self),
+            Flag::File(_) => executor.execute_file(self),
         }
     }
 }
@@ -60,6 +62,7 @@ pub enum Flag {
     Interface(String),
     Watch,
     Details,
+    File(String),
 }
 
 impl Flag {
@@ -80,6 +83,7 @@ impl Flag {
             Flag::Interface(_) => ("i", "interface"),
             Flag::Watch => ("w", "watch"),
             Flag::Details => ("d", "details"),
+            Flag::File(_) => ("f", "file"),
         }
     }
 
@@ -89,6 +93,7 @@ impl Flag {
             Flag::Interface(_) => "Configure network interface",
             Flag::Watch => "Monitor network packets",
             Flag::Details => "Enable detailed output",
+            Flag::File(_) => "Specify a file to save output",
         }
     }
 }

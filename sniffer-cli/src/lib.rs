@@ -1,5 +1,5 @@
 use core::{Command, CommandDiscovery, CommandExecutor, Flag};
-use package_reader::packet_reader;
+use packets::packet_reader;
 
 pub struct CliExecutor;
 
@@ -13,6 +13,7 @@ impl CommandExecutor for CliExecutor {
         Ok(())
     }
 
+    // TODO: This command shouldn't be executable. This should be the watch command
     fn execute_interface(&self, command: &Command) -> Result<(), String> {
         let interface = if let Flag::Interface(i) = &command.main_flag {
             i
@@ -29,8 +30,15 @@ impl CommandExecutor for CliExecutor {
         Ok(())
     }
 
+    // TODO:
+    // This is basically implmented in the interface
+    // need to refactor a bit.
     fn execute_watch(&self, _command: &Command) -> Result<(), String> {
         todo!()
+    }
+
+    fn execute_file(&self, command: &Command) -> Result<(), String> {
+        Ok(())
     }
 }
 

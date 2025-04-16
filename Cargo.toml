@@ -1,5 +1,5 @@
 [workspace]
-members = ["package-reader", "core", "sniffer", "sniffer-cli"]
+members = ["packets", "core", "sniffer", "sniffer-cli"]
 resolver = "2"
 
 # Optional workspace-wide settings
